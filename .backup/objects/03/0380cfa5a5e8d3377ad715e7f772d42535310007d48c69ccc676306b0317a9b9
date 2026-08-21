@@ -1,0 +1,97 @@
+package com.java.myapplication
+
+import android.content.Context
+import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.lang.reflect.Method
+
+class KTVMainActivity : ComponentActivity() {
+    private var ktvInstance: Any? = null
+    private var initSuccess = false
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // 加载 native 库
+        try {
+            System.loadLibrary("wexguard_v7")
+            System.loadLibrary("wexguard_v8")
+        } catch (e: Throwable) {
+            // 尝试直接加载 so 文件路径
+            try {
+                val assets = assets.list("spider/assets") ?: emptyArray()
+                for (soName in assets) {
+                    if (soName.endsWith(".so")) {
+                        val libName = soName.removePrefix("wexguard_").removeSuffix(".so")
+                        try {
+                            System.loadLibrary(libName)
+                        } catch (e2: Throwable) {}
+                    }
+                }
+            } catch (e: Throwable) {}
+        }
+        
+        // 初始化 KTV 实例
+        initKTV()
+        
+        setContent {
+            MaterialTheme {
+                KTVScreen(
+                    initSuccess = initSuccess,
+                    onBack = { finish() }
+                )
+            }
+        }
+    }
+    
+    private fun initKTV() {
+        try {
+            val clazz = Class.forName("com.github.catvod.spider.MusicAiIKtvGuard")
+            ktvInstance = clazz.newInstance()
+            initSuccess = true
+            Toast.makeText(this, "KTV Guard 初始化成功", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            initSuccess = false
+            Toast.makeText(this, "KTV 初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+    
+    fun startKTV() {
+        if (!initSuccess || ktvInstance == null) {
+            Toast.makeText(this, "KTV 未初始化", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val clazz = ktvInstance!!::class.java
+            val method: Method? = clazz.getMethod("startKTV")
+            method?.invoke(ktvInstance)
+        } catch (e: Exception) {
+            Toast.makeText(this, "启动失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    fun playSong(songId: String) {
+        if (!initSuccess || ktvInstance == null) return
+        try {
+            val clazz = ktvInstance!!::class.java
+            val method = clazz.getMethod("playSong", String::class.java)
+            method.invoke(ktvInstance, songId)
+        } catch (e: Exception) {
+            Toast.makeText(this, "播放失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
